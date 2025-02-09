@@ -1,0 +1,51 @@
+name: MyPipeline
+on:
+  workflow_dispatch:
+jobs:
+  Clone_Repository:
+    name: Clone Repository
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+      with:
+        repository: mayurdevops24/Jenkins-pipeline
+  Build:
+    runs-on: ubuntu-latest
+    needs: Clone_Repository
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: echo Building the project...
+  Test:
+    runs-on: ubuntu-latest
+    needs: Build
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: echo Running tests...
+  Deploy:
+    runs-on: ubuntu-latest
+    needs: Test
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: echo Deploying application...
+  Post-Build:
+    if: always()
+    name: Post Build
+    runs-on: ubuntu-latest
+    needs:
+    - Clone_Repository
+    - Build
+    - Test
+    - Deploy
+    steps:
+    - name: echo message
+      run: echo Pipeline completed.
+      if: always()
