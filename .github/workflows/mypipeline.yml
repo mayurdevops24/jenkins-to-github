@@ -60,7 +60,7 @@ jobs:
     - name: checkout
       uses: actions/checkout@v4.1.0
     - name: echo message
-      run: 'echo ${"[Info] Executing pipeline for project: "+env.PATCH_NAME+'' @ ''+env.RELEASE+'' (DEBUG Mode = ''+env.DEBUG+'')''}'
+      run: echo "[Info] Executing pipeline for project: $PATCH_NAME @ $RELEASE (DEBUG Mode = $DEBUG)"
     - name: sh
       shell: bash
       run: ip -h -f inet add
