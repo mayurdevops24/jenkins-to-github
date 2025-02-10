@@ -1,51 +1,730 @@
 name: MyPipeline
 on:
   workflow_dispatch:
+    inputs:
+      PATCH_NAME:
+        required: false
+        description: Inform the patch number
+        default: none
+      RELEASE:
+        required: false
+        description: Inform the release
+        default: QBL.d
+      REFERENCE:
+        required: false
+        description: Optionally inform reference baseline
+        default: none
+      DEBUG:
+        required: false
+        description: Inform the debug level
+        default: 'FALSE'
+      LIB_BRANCH:
+        required: false
+        description: Inform the LIB BRANCH to bind
+        default: master
+env:
+#   # This item has no matching transformer
+#   PATH: '"/sdev/simgt/sbin:$PATH"'
+  SQUID_DBSET: CQMS.ASML.EINDHOVEN
+  CCMAKE_CONTINUE_ON_ERROR: 'TRUE'
+  CCASE_ENABLE_SQUID: 1
+#   # This item has no matching transformer
+#   PROD_TOKEN:
+#   # This item has no matching transformer
+#   FCO_PROD_TOKEN:
+#   # This item has no matching transformer
+#   STAGING_TOKEN:
+#   # This item has no matching transformer
+#   PATCH_NAME: ${evalParameter('PATCH_NAME',"${{ inputs.PATCH_NAME }}")}
+#   # This item has no matching transformer
+#   RELEASE: ${evalParameter('RELEASE',"${{ inputs.RELEASE }}")}
+#   # This item has no matching transformer
+#   REFERENCE: ${evalParameter('REFERENCE',"${{ inputs.REFERENCE }}")}
+#   # This item has no matching transformer
+#   DEBUG: ${evalParameter('DEBUG',"${{ inputs.DEBUG }}")}
+#   # This item has no matching transformer
+#   PYTHONPATH: '"$WORKSPACE/lib/obi-fw:$WORKSPACE/lib/simgt/python23:/home/simgt/litho-bitbucket/simgt-home-lib/python3.8/site-packages:/home/simgt/.caddir/RHEL8/cadlib:/home/simgt/.caddir/RHEL8/.caddata:lib/python:bin/python"'
+  PYTHONHOME: ''
+  PIP_CONFIG_FILE: "/home/simgt/.obi/pip.conf"
+#   # This item has no matching transformer
+#   USE_QUEUE_STAGING: "${isTestEnvironment()}"
+#   # This item has no matching transformer
+#   ALLOW_AUTO_INTEGRATION: "${selectEnvAllowAutoMerge()}"
 jobs:
-  Clone_Repository:
-    name: Clone Repository
-    runs-on: ubuntu-latest
-    steps:
-    - name: checkout
-      uses: actions/checkout@v4.1.0
-    - name: checkout
-      uses: actions/checkout@v4.1.0
-      with:
-        repository: mayurdevops24/Jenkins-pipeline
-  Build:
-    runs-on: ubuntu-latest
-    needs: Clone_Repository
+  Define_Job_Configuration:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Define Job Configuration
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
     steps:
     - name: checkout
       uses: actions/checkout@v4.1.0
     - name: echo message
-      run: echo Building the project...
-  Test:
-    runs-on: ubuntu-latest
-    needs: Build
+      run: 'echo ${"[Info] Executing pipeline for project: "+env.PATCH_NAME+'' @ ''+env.RELEASE+'' (DEBUG Mode = ''+env.DEBUG+'')''}'
+    - name: sh
+      shell: bash
+      run: ip -h -f inet add
+    - name: sh
+      shell: bash
+      run: source /cadappl/cadenv/cadenv_switch.sh CI
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: "def subModuleBranch = evalParameter('LIB_BRANCH', \"${{ inputs.LIB_BRANCH }}\")\n                    command = './bin/configure-submodules.sh > configure-submodules-out.txt ' + subModuleBranch + '; echo $? > status;'\n                    sh ( script: command , returnStdout: true )\n                    println '[Result] - Exit Value: ' + readFile('status').trim()\n\n                    // Clean the previous venv in the same node (if any).\n                    sh ( script: 'rm -rf .venv || true')\n                    try {\n                        sh \"\"\"\n                          python3 -m venv .venv\n                          .venv/bin/pip install --no-cache-dir --upgrade pip\n                          .venv/bin/pip install --no-cache-dir pymysql mysql-connector mysql-connector-python\n                        \"\"\"\n                    } catch( Exception ex ) {\n                        println \"Fall back to backup '.venv' area, since the following exception was caugth while trying to setup the virtualenv: \" + ex.toString()\n                        sh \"\"\"\n                          rm -rf .venv || true\n                          ln -f -s /home/simgt/.obi/.venv\n                        \"\"\"\n                    }\n\n                    // Activate the venv\n                    sh ( script: 'source .venv/bin/activate' )\n                    // Echo'ing default PYTHONPATH value as seen from the shell\n                    sh ( script: 'echo \"PYTHONPATH set to : $PYTHONPATH\"', returnStdout: true )\n                    // Validates which python3 interpreter is in use\n                    sh ( script: 'echo -n \"python3 set to : \" && which python3', returnStdout: true )\t\t\t\t\t\n                    \n// Prevent double-executions for the same parameters in PATCH_NAME and RELEASE, for the same environment.\n                    if (env.USE_QUEUE_STAGING.toBoolean()) {\n                        command = './checkers/23/checkExecutionStatus.py -d --env test --rel ' + env.RELEASE + ' -p ' + env.PATCH_NAME + ' --build-id ' + env.BUILD_NUMBER + '; echo $? > status;'\n                    } else {\n                        command = './checkers/23/checkExecutionStatus.py --env pk8s --rel ' + env.RELEASE + ' -p ' + env.PATCH_NAME + ' --build-id ' + env.BUILD_NUMBER + '; echo $? > status;'\n                    }\n\n                    sh ( script: command , returnStdout: true )\n                    println '[Result] - Exit Value: ' + readFile('status').trim()\n\n                    // If this execution is valid, set the displayed name for it:\n                    currentBuild.displayName = \"${{ env.PATCH_NAME }}\"\n\n                    // Gather the information regarding the PATCH_NAME and RELEASE, considering the PT environment to look for:\n                    command = './checkers/23/gatherDeliveryInfo.py'\n\n                    if (env.DEBUG.toBoolean()) {\n                        println '[Debug] Using Staging area. Adding -e -d to the command call'\n                        command += ' -e -d  --rel ' + env.RELEASE + ' -p ' + env.PATCH_NAME + ' --build-id ' + env.BUILD_NUMBER + ' --token ' + env.STAGING_TOKEN\n                    } else {\n                        command += ' --rel ' + env.RELEASE + ' -p ' + env.PATCH_NAME + ' --build-id ' + env.BUILD_NUMBER + ' --token ' + env.PROD_TOKEN\n                    }\n\n                    stepName = 'Define Job Configuration'\n                    shChain()\n\n                    // Fail the step after storing the step result key in the hash (for post actions).\n                    if ( stepSummary.get(stepName) == 'FAILED' ) {\n                        sh ( script: '/bin/false' )\n                    } else {\n                        // Notify Release Integrators and project that a new valid run has been started on the pipeline.\n                        command = './checkers/23/notifyJobStart.py --rel ' + env.RELEASE + ' --job-name ' + env.JOB_NAME + ' --build-url ' + env.BUILD_URL + ' -p ' + env.PATCH_NAME + ' --build-id ' + env.BUILD_NUMBER + '; echo $? > status;'\n\n                        sh ( script: command , returnStdout: true )\n                        println '[Result] - Exit Value: ' + readFile('status').trim()\n                    }"
+  Release_Quality_Policy_Check:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Release Quality Policy Check
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Define_Job_Configuration
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/3.8/zerotolerance-analysis.py -d --build-id ' + env.BUILD_NUMBER + ' --job-name ' + env.JOB_NAME
+#                                 stepName    = 'Release Quality Policy Check'
+#                                 shChain()
+  Perform_Static_Checks:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Perform Static Checks
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Release_Quality_Policy_Check
     steps:
     - name: checkout
       uses: actions/checkout@v4.1.0
     - name: echo message
-      run: echo Running tests...
-  Deploy:
-    runs-on: ubuntu-latest
-    needs: Test
+      run: 'echo ${"[Info] Running pre-static checks for patch: "+env.PATCH_NAME}'
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             println '[Info] initial patch prediction'
+#                                 command     = './checkers/23/generatePrediction.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Generate Patch'
+#                                 shChain()
+#
+#                                 println '[Info] Storing Original CWBD integration-related checks as provided by the project on HOI time.'
+#                                 command     = './checkers/23/recordCwbdStatus.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PreInt-CWBD'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Running selected CWBD integration-related checks after recording the initial status.'
+#                                 command     = './checkers/23/runCwbd.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PreInt-CWBD'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check XFaceMaker Changes.'
+#                                 command     = './checkers/23/checkXfacemaker.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PreInt-CheckXFaceMaker'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check VP Items.'
+#                                 command     = './checkers/23/runCheckVP.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PreInt-CheckVP'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check VP Items legacy style'
+#                                 command     = './checkers/23/checkLegacyVP.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Legacy-CheckVP'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check CM Items.'
+#                                 command     = './checkers/23/runCheckCM.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PreInt-CheckCM'
+#                                 shChain()
+#             // --------
+#                                 // Because this checker have different trigger conditions, the 'when' clause of them needed to be converted to if clauses inside the aggregator step.
+#                                 // --------
+#                                 // Skip next checkers for fastlanes (based on name pattern)
+#                                 //if ( env.PATCH_NAME.contains('_fl_') || env.PATCH_NAME.contains('_notgt_') ) {
+#                                 //    stepSummary.put('Questionnaire-Check' , 'SKIPPED')
+#                                 //} else {
+#                                 println '[Info] PDF-Questionnaire for non-fastlanes pdfs in QBL.d release.'
+#                                 command     = './checkers/23/parseQuestionnaire.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Questionnaire-Check'
+#                                 shChain()
+#                                 //}
+#                                 // --------
+#                                 println '[Info] Check if PDF has AIRs already integrated before.'
+#                                 command     = './checkers/23/checkAIRnotAlreadyDelivered.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Duplicated AIR'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check DeliverConfig.'
+#                                 command     = './checkers/23/checkDeliverConfig.py --build-id ' + env.BUILD_NUMBER + ' --rel ' + params.RELEASE
+#                                 stepName    = 'Check-DeliverConfig'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check illegal scopefile dependencies.'
+#                                 command     = './checkers/23/checkrpforBBAndInterface.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Check-Scope'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check illegal changes in makefiles.'
+#                                 command     = './checkers/23/checkIllegalFolders.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Check-Makefile'
+#                                 shChain()
+#                                 // --------
+#                                 println '[Info] Check illegal MDL changes.'
+#                                 command     = './checkers/23/checkMDL.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Check-MDL'
+#                                 shChain()
+#                                 // Execute automatic approval of FCO for test only code
+#                                 command     = './checkers/3.8/acceptTestOnlyFCO.py --build-id ' + env.BUILD_NUMBER + ' --token ' + env.FCO_PROD_TOKEN
+#                                 stepName    = 'Auto-Approve-FCO'
+#                                 shChain()
+#                                 // --------
+#                                 command     = './checkers/23/isFcoAccepted.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'FCO Status'
+#                                 shChain()
+#                                 // --------
+#                                 command     = './checkers/23/checkFactoryManualActions.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Factory-Manual-Actions'
+#                                 shChain()
+#
+#                                 // Add tags for Test Only Deliveries
+#                                 command = "/bin/sh +e -c './checkers/23/addTestOnlyDeliveryTag.py --build-id " + env.BUILD_NUMBER + "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#                                 stepName   = 'Add Test Only Delivery Tags'
+#             // check presence of KT and send notificatio when present
+#                                 command = "/bin/sh +e -c './checkers/23/checkKT.py --build-id " + env.BUILD_NUMBER + "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#                                 // --------
+#                                 if (selectEnvAllowAutoMerge()) {
+#                                     println '[Info] Check overlap for pdfs in QBL.d release.'
+#                                     command     = './checkers/23/checkBaselined.py --build-id ' + env.BUILD_NUMBER
+#                                     stepName    = 'Check Overlap'
+#                                     shChain()
+#                                 }
+#                                 else {
+#                                     command     = './checkers/23/checkOverlap.py --build-id ' + env.BUILD_NUMBER
+#                                     stepName    = 'Check Overlap'
+#                                     shChain()
+#                                 }
+#
+#                                 // Ending Logic to determine if this step failed based on the results of the above executions
+#
+#                                 boolean isGroupFailure = false
+#
+#                                 for (String entry : stepSummary.keySet()) {
+#
+#                                     // Only care about the steps results in this group (slice of stepSummary total keys)
+#                                     if (entry =~ /PreInt-CWBD|PreInt-CheckXFaceMaker|PreInt-CheckVP|PreInt-CheckCM|FCO Status|Factory-Manual-Actions|Questionnaire-Check|Duplicated AIR|Check-DeliverConfig|Check-Scope|Check-Makefile|Check-MDL|Check Overlap/) {
+#                                         println '[Result] - ' + entry + ' : ' + stepSummary.get(entry)
+#
+#                                         // If one of the checks in this group fails, consider the whole step as FAILED.
+#                                         if (stepSummary.get(entry) == 'FAILED')
+#                                             isGroupFailure = true
+#                                     }
+#                                 }
+#
+#                                 println '[Info] Final result for static checks: ' + ( (isGroupFailure == false ) ? 'OK' : 'NOK' )
+#
+#                                 if (isGroupFailure) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Wait_for_new_baseline:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Wait for new baseline
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Perform_Static_Checks
     steps:
     - name: checkout
       uses: actions/checkout@v4.1.0
     - name: echo message
-      run: echo Deploying application...
+      run: echo [Info] Check if a new daily build have started and wait until the baseline is ready if there is a new daily build running
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/waitForNewBaseline.py --build-id ' + env.BUILD_NUMBER + ' --ref ' + params.REFERENCE
+#                                 stepName    = 'Wait for new baseline'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Change_FI_Create_New_View:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Change FI + Create New View
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Wait_for_new_baseline
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: 'echo ${"[Info] Change FI to simgt in: "+env.PATCH_NAME+" and creating a new view."}'
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/changeFI.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Change-FI'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Rebase_to_Latest_Daily:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Rebase to Latest Daily
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Change_FI_Create_New_View
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: echo ${"[Info] Rebasing "+env.PATCH_NAME+" to the latest QBL daily baseline."}
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command = "/bin/sh +e -c './checkers/23/extendBuildscopeForDependingComponents.py --extrasmart --build-id " + env.BUILD_NUMBER+ "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#
+#                                 // rebase to the latest daily
+#                                 command     = './checkers/23/rebaseToLatestDaily.py --build-id ' + env.BUILD_NUMBER + ' --rel ' + params.RELEASE
+#                                 stepName    = 'Rebase-LatestDaily'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Schedule_Build:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Schedule Build
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Rebase_to_Latest_Daily
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: 'echo ${"[Info] About to build simgt view of: "+env.PATCH_NAME}'
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/executeBuild.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Schedule Build'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Check_Build_Results:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Check Build Results
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Schedule_Build
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: 'echo ${"[Info] Checking the outcome of the build for patch: "+env.PATCH_NAME}'
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/checkBuildResults.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Build Results'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Generate_Prediction:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Generate Prediction
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Check_Build_Results
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/generatePrediction.py -r -c --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Generate Patch'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Check_Partial_Vent:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Check Partial Vent
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Generate_Prediction
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/checkPartialVent.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Check Partial Vent'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Wait_for_devbench_images:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Wait for devbench images
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Check_Partial_Vent
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: echo [Info] Check the devbench images for the latest baseline are available
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command = "/bin/sh +e -c './checkers/23/checkCloudQuota.py --build-id " + env.BUILD_NUMBER + ' --ref ' + params.REFERENCE + "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#
+#                                 command = "/bin/sh +e -c './checkers/23/preScheduleQsetOnPatchedImages.py --build-id " + env.BUILD_NUMBER + ' --job-name ' + env.JOB_NAME + ' --rel ' + params.RELEASE + ' --ref ' + params.REFERENCE + "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#
+#                                 command = "/bin/sh +e -c './checkers/23/scheduleTBQset.py --build-id " + env.BUILD_NUMBER + ' --job-name ' + env.JOB_NAME + ' --rel ' + params.RELEASE + ' --ref ' + params.REFERENCE + "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#
+#                                 command     = './checkers/23/waitForDevbenchImages.py --build-id ' + env.BUILD_NUMBER + ' --ref ' + params.REFERENCE
+#                                 stepName    = 'Wait for devbench images'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 } else {
+#                                     command = "/bin/sh +e -c './checkers/23/preScheduleIBQ.py --build-id " + env.BUILD_NUMBER + ' --job-name ' + env.JOB_NAME + ' --rel ' + params.RELEASE + ' --ref ' + params.REFERENCE + "; echo \$? > status; /bin/true;'"
+#                                     sh ( script: command , returnStdout: true )
+#                                 }
+  Complete_Rebase_Make_BL:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Complete Rebase + Make BL
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Wait_for_devbench_images
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/completeRebaseAndMakeBaseline.py --build-id ' + env.BUILD_NUMBER + ' --rel ' + params.RELEASE + ' --ref ' + params.REFERENCE
+#                                 stepName    = 'Complete-Rebase-BL'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Post_Static_Checks:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Post Static Checks
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Complete_Rebase_Make_BL
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: 'echo ${"[Info] Running POST static checks for patch: "+env.PATCH_NAME}'
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/runCwbd.py --post --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PostInt-CWBD'
+#                                 shChain()
+#                                 // --------
+#                                 command     = './checkers/23/checkXfacemaker.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PostInt-CheckXFaceMaker'
+#                                 shChain()
+#                                 // --------
+#                                 command     = './checkers/23/runCheckVP.py  --post --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PostInt-CheckVP'
+#                                 shChain()
+#                                 // --------
+#                                 command     = './checkers/23/runCheckCM.py --post --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'PostInt-CheckCM'
+#                                 shChain()
+#
+#                                 // Ending Logic to determine if this step failed based on the results of the above executions
+#
+#                                 boolean isPostGroupFailure = false
+#
+#                                 for (String entry : stepSummary.keySet()) {
+#
+#                                     // Only care about the steps results in this group (slice of stepSummary total keys)
+#                                     if (entry =~ /PostInt-CWBD|PostInt-CheckVP|PostInt-CheckCM|PostInt-CheckXFaceMaker/) {
+#                                         println '[Result] - ' + entry + ' : ' + stepSummary.get(entry)
+#
+#                                         // If one of the checks in this group fails, consider the whole step as FAILED.
+#                                         if ( stepSummary.get(entry) == 'FAILED' )
+#                                             isPostGroupFailure = true
+#                                     }
+#                                 }
+#
+#                                 println '[Info] Final result for post static checks: ' + ( (isPostGroupFailure == false ) ? 'OK' : 'NOK' )
+#
+#                                 if (isPostGroupFailure) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Test_Domain_Checks:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Test Domain Checks
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Post_Static_Checks
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/runTestarenaTests.py --build-id ' + env.BUILD_NUMBER + ' --job-name ' + env.JOB_NAME + ' --rel ' + params.RELEASE + ' --ref ' + params.REFERENCE
+#                                 stepName    = 'Run Tests'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Wait_for_recommendation:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Wait for recommendation
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Test_Domain_Checks
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+    - name: echo message
+      run: echo [Info] Check if a new daily build have started and wait until the baseline is ready if there is a new daily build running
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/waitForRecommendation.py --build-id ' + env.BUILD_NUMBER + ' --ref ' + params.REFERENCE + ' --token ' + env.PROD_TOKEN
+#                                 stepName    = 'Wait for recommendation'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Check_Integration_Status:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Check Integration Status
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Wait_for_recommendation
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command = "/bin/sh +e -c './checkers/23/recordMergeCompatibilityInfo.py --build-id " + env.BUILD_NUMBER + "; echo \$? > status; /bin/true;'"
+#                                 sh ( script: command , returnStdout: true )
+#
+#                                 command     = './checkers/23/manageQueue.py'
+#                                 stepName    = 'Check Integration Status'
+#
+#                                 if (env.USE_QUEUE_STAGING.toBoolean()) {
+#                                     println '[Debug] Manage Queue on staging area. Adding -e -d to the command call'
+#                                     command += ' -e -d --build-id ' + env.BUILD_NUMBER
+#                                 } else {
+#                                     command += ' --build-id ' + env.BUILD_NUMBER
+#                                 }
+#
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+  Integrate_to_QBL:
+    if:
+#       # Unsupported condition(s) [expression]
+    name: Integrate to QBL
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
+    needs: Check_Integration_Status
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4.1.0
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: |-
+#             command     = './checkers/23/checkOverlap.py --build-id ' + env.BUILD_NUMBER
+#                                 stepName    = 'Final Check Overlap'
+#                                 shChain()
+#
+#                                 // Fail the step after storing the step result key in the hash (for post actions).
+#                                 if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                     sh ( script: '/bin/false')
+#                                 }
+#
+#                                 if (selectEnvAllowAutoMerge()) {
+#                                     if (env.DEBUG.toBoolean()) {
+#                                         println '[Debug] Using Staging area. Will integrate to 4.0.4.c.'
+#                                         command = 'echo ./checkers/23/integrateTo404.py --build-id ' + env.BUILD_NUMBER
+#                                     } else {
+#                                         command = './checkers/23/integrateToQBL.py --build-id ' + env.BUILD_NUMBER
+#                                     }
+#
+#                                     stepName    = 'Integrate-to-QBL'
+#                                     shChain()
+#
+#                                     // Fail the step after storing the step result key in the hash (for post actions).
+#                                     if ( stepSummary.get(stepName) == 'FAILED' ) {
+#                                         sh ( script: '/bin/false')
+#                                     }
+#                                 }
   Post-Build:
     if: always()
     name: Post Build
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - simgt-fullclient-2
     needs:
-    - Clone_Repository
-    - Build
-    - Test
-    - Deploy
+    - Define_Job_Configuration
+    - Release_Quality_Policy_Check
+    - Perform_Static_Checks
+    - Wait_for_new_baseline
+    - Change_FI_Create_New_View
+    - Rebase_to_Latest_Daily
+    - Schedule_Build
+    - Check_Build_Results
+    - Generate_Prediction
+    - Check_Partial_Vent
+    - Wait_for_devbench_images
+    - Complete_Rebase_Make_BL
+    - Post_Static_Checks
+    - Test_Domain_Checks
+    - Wait_for_recommendation
+    - Check_Integration_Status
+    - Integrate_to_QBL
     steps:
-    - name: echo message
-      run: echo Pipeline completed.
-      if: always()
+#     # 'script' was not transformed because there is no suitable equivalent in GitHub Actions
+#     - name: script
+#       arguments:
+#       - key: scriptBlock
+#         value:
+#           isLiteral: true
+#           value: "println '[Debug] Original stepSummary / build status : ' + stepSummary + ' ' + \" - RESULT : ${currentBuild.result}\"\n\n                // Adjusting the first failed step to result FAILED in the stepSummary.\n                for ( String referenceKey : stepReference.keySet() ) {\n                    if ( !stepSummary.containsKey(referenceKey) ) {\n                        stepSummary.referenceKey = 'FAILED'\n                        break\n                    }\n                }\n\n                if (env.PATCH_NAME != 'none') {\n\n                    if ( currentBuild.result == 'FAILURE' ) {\n\n                        // Check 1 - If we need to cancel a pending rebase.\n                        // On failure during the Rebase-LatestDaily or up to the step before Complete-Rebase-BL, there will be no key 'Complete-Rebase-BL' on the stepSummary.\n                        // On success during the Rebase-LatestDaily, a rebase is still needed to be cancelled if, after Complete-Rebase-BL is reached, it fails.\n                        if ( ( stepSummary.containsKey('Rebase-LatestDaily') && !stepSummary.containsKey('Complete-Rebase-BL') ) || ( stepSummary.containsKey('Complete-Rebase-BL') && stepSummary.'Complete-Rebase-BL' == 'FAILED' ) ) {\n                            println '[Info] Cancelling the pending rebase.'\n                            command     = './checkers/23/rebaseToLatestDaily.py --rollback --build-id ' + env.BUILD_NUMBER + ' --rel ' + params.RELEASE + ' --ref ' + params.REFERENCE\n                            stepName    = 'Cancel-Rebase'\n                            shChain()\n\n                            // Since we are in post actions, no need to '/bin/false' it here.\n                        }\n // Check 2 - If we need to return the stream to the original FI (order matters as you cannot change FI on a pending rebase stream.)\n                        // This does not work using post-failure action because 'always' executes first, instead of 'failure' block\n                        if (!stepSummary.containsKey('Wait for recommendation') || stepSummary.get('Wait for recommendation') != 'FAILED') {\n                            println '[Info] Returning FI back to original FI.'\n                            command     = './checkers/23/changeFI.py --rollback --build-id ' + env.BUILD_NUMBER\n                            stepName    = 'Rollback-FI-to-Project'\n                            shChain()\n\n                            // Since we are in post actions, no need to '/bin/false' it here.\n                        }\n                        else {\n                            println '[Info] Project before changing feature integrator or it failed while waiting for recommendation. Keep current FI.'\n                        }\n\n                        // Check 3 - Return PDF state to ACCEPTED (FALIURE condition)\n                        // Only change PDF state if Gather information succeeds.\n                        if (stepSummary.containsKey('Define Job Configuration') && stepSummary.get('Define Job Configuration') == 'SUCCESS') {\n\n                            // [SIM-407] Do not set the PDF back to acceped if specific stages failed ('Check Integration Status' and 'Check-DeliverConfig')\n                            if(\n                               (stepSummary.containsKey('Check-DeliverConfig') && stepSummary.get('Check-DeliverConfig') == 'FAILED') ||\n                               (stepSummary.containsKey('Check Integration Status') && stepSummary.get('Check Integration Status') == 'FAILED')\n                              ) {\n                                println '[Warning] Keeping PDF in HOI state due to the nature of the failure. Please trigger this execution one more time.'\n                            } else {\n                                if ((stepSummary.containsKey('Wait for new baseline') && stepSummary.get('Wait for new baseline') == 'FAILED') || (stepSummary.containsKey('Wait for devbench images') && stepSummary.get('Wait for devbench images') == 'FAILED') || (stepSummary.containsKey('Wait for recommendation') && stepSummary.get('Wait for recommendation') == 'FAILED')) {\n                                    println '[Info] Project failed in one of the waiting steps. Keep in HANDOVER state for reprocessing.'\n                                }\n                                else {\n                                    println '[Info] Returning PDF back to ACCEPTED state.'\n                                    command     = './checkers/23/changeState.py --event back_to_accepted --build-id ' + env.BUILD_NUMBER\n                                    stepName    = 'Return-PDF'\n                                    shChain()\n                                }\n                            }\n                        } else {\n                            // reverting the PDF to avoid the poller keep rescheduling when the project fails because FI doesn't have a valid integration view\n                            println '[Info] Returning PDF back to ACCEPTED state.'\n                            command     = './checkers/23/changeState.py --event back_to_accepted --build-id ' + env.BUILD_NUMBER\n                            stepName    = 'Return-PDF'\n                            shChain()\n println 'integration view was not found.'\n                            // notify missing view failure\n                            command = \"/bin/sh +e -c './checkers/23/notify-missing-integration-view.py --build-id \" + env.BUILD_NUMBER + ' --build-url ' + env.BUILD_URL + ' --job-name ' + env.JOB_NAME + ' --rel ' + env.RELEASE + ' -p ' + env.PATCH_NAME + ' --token ' + env.PROD_TOKEN + \"; echo \\$? > status; /bin/true;'\"\n                            sh ( script: command , returnStdout: true )\n\n                        }\n\n                    } else if (currentBuild.result == null || currentBuild.result == 'SUCCESS') {\n\n                        // Forcibly define build execution as SUCCESS if is still not defined up to here.\n                        currentBuild.result = 'SUCCESS'\n\n                        // trigger fire and forget call to smarttest PoC\n                        //command = \"/home/dcresti/obi/smarttest/ci-recipes/checkers/23/trigger-smarttest \" + env.PATCH_NAME + \" \" + env.BUILD_NUMBER\n                        //sh ( script: command, returnStdout: true )\n                        /*\n                        When Auto Integration is disabled, move the PDF to RFI if it succeded. In this case\n                        \"Last-Minute-Overlap\" should be performed manually by the QBL release integrator.\n                        */\n                        //if (! selectEnvAllowAutoMerge()) {\n                        //    println '[Info] Promoting PDF to READY FOR INTEGRATION state. Please manually verify overlap once more before integrate project ' + env.PATCH_NAME\n                        //    command     = './checkers/23/changeState.py --event ready_for_integration --build-id ' + env.BUILD_NUMBER\n                        //    stepName    = 'Promote-PDF'\n                        //    shChain()\n                        //}\n                    }\n\n                    def summary = '{'\n\n                    for (String referenceKey : stepReference.keySet()) {\n                        summary += '\"' + referenceKey + '\" : \"' + ( ( stepSummary.containsKey(referenceKey) ) ? stepSummary.get(referenceKey) : stepReference.get(referenceKey) ) + '\",'\n                    }\n\n                    summary += '}'\n\n                    println '[JSON Summary] ' + summary\n\n                    // Transforming text to JSON Object.\n                    def summaryAsJSON = readJSON text: summary\n                    writeJSON file: \"${{ env.BUILD_NUMBER }}\" + '-summary.json', json: summaryAsJSON, pretty: 4\n                    archiveArtifacts artifacts: \"${{ env.BUILD_NUMBER }}\" + '-summary.json'\n\n                    // Only archive this if Gather information succeeds.\n                    if (stepSummary.containsKey('Define Job Configuration') && stepSummary.get('Define Job Configuration') == 'SUCCESS') {\n   command = \"/bin/sh +e -c './checkers/23/notifyEndOfExecutionToProject.py --build-id \" + env.BUILD_NUMBER + ' --build-url ' + env.BUILD_URL + ' --job-name ' + env.JOB_NAME + ' --rel ' + env.RELEASE + ' --ref ' + env.REFERENCE + \"; echo \\$? > status; /bin/true;'\"\n                        sh ( script: command , returnStdout: true )\n\n                        command = \"/bin/sh +e -c './checkers/23/mailSummaryExecution.py --build-id \" + env.BUILD_NUMBER + ' --build-url ' + env.BUILD_URL + ' --job-name ' + env.JOB_NAME + \"; echo \\$? > status; /bin/true;'\"\n                        sh ( script: command , returnStdout: true )\n                        println '[Result] - Exit Value: ' + readFile('status').trim()\n                        archiveArtifacts artifacts: \"${{ env.BUILD_NUMBER }}\" + '-data.json'\n                    }\n\n                    // [SIM-392] Always generate the statistics JSON object\n                    command = \"/bin/sh +e -c './checkers/23/generateJobStatistics.py --build-id \" + env.BUILD_NUMBER + ' --build-url ' + env.BUILD_URL + ' --job-name ' + env.JOB_NAME + \"; echo \\$? > status; /bin/true;'\"\n                    sh ( script: command , returnStdout: true )\n                    println '[Result] - Exit Value: ' + readFile('status').trim()\n                    archiveArtifacts artifacts: \"${{ env.BUILD_NUMBER }}\" + '-statistics.json'\n\n                    // Log file should be archived in any case\n                    //archiveArtifacts artifacts: \"${{ env.BUILD_NUMBER }}\" + '.log'\n\n                    // [SIM-562] Upload to splunk cloud\n                    command = \"/bin/sh +e -c './checkers/23/splunk-upload.py --build-id \" + env.BUILD_NUMBER + ' --build-url ' + env.BUILD_URL + ' --job-name ' + env.JOB_NAME + \"; echo \\$? > status; /bin/true;'\"\n                    sh ( script: command , returnStdout: true )\n                    println '[Result] - Exit Value: ' + readFile('status').trim()\n\t\t\t\t\t\n                }"
+#       if: always()
