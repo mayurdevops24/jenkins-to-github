@@ -55,9 +55,7 @@ jobs:
     if:
 #       # Unsupported condition(s) [expression]
     name: Define Job Configuration
-    runs-on:
-      - ubuntu-latest
-      - simgt-fullclient-2
+    runs-on: ubuntu-latest
     steps:
     - name: checkout
       uses: actions/checkout@v4.1.0
